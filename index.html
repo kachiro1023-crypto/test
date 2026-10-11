@@ -1,5 +1,94 @@
-<html>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>あいうえお</title>
+</head>
+<body>
     <h1>あいうえお</h1>
     <h2>かめ</h2>
 
+    <footer>
+        <h3>ご意見掲示板</h3>
+        <form id="board-form">
+            <p><input type="text" id="nickname" placeholder="ニックネーム" maxlength="20" required></p>
+            <p><textarea id="message" placeholder="ご意見" rows="3" maxlength="200" required></textarea></p>
+            <p><button type="submit">書き込む</button></p>
+        </form>
+        <ul id="board-list"></ul>
+    </footer>
+
+    <script>
+        // Supabase (PostgREST) に保存。publishable キーは公開前提で、RLS で保護されています。
+        const SUPABASE_URL = 'https://fvvgmbsoqmzirncomfkv.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_V4ZGUARdGeiWWq7P1qDlCg_c0cKsWnc';
+        const ENDPOINT = SUPABASE_URL + '/rest/v1/board_posts';
+        const HEADERS = {
+            'apikey': SUPABASE_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_KEY,
+            'Content-Type': 'application/json'
+        };
+
+        const list = document.getElementById('board-list');
+        const form = document.getElementById('board-form');
+        const button = form.querySelector('button');
+
+        function showMessage(text) {
+            list.textContent = '';
+            const li = document.createElement('li');
+            li.textContent = text;
+            list.appendChild(li);
+        }
+
+        function render(posts) {
+            list.textContent = '';
+            posts.forEach(p => {
+                const li = document.createElement('li');
+                const name = document.createElement('strong');
+                name.textContent = p.nickname;
+                const time = document.createElement('small');
+                time.textContent = ' (' + new Date(p.created_at).toLocaleString('ja-JP') + ')';
+                const body = document.createElement('div');
+                body.textContent = p.message;
+                li.append(name, time, body);
+                list.appendChild(li);
+            });
+        }
+
+        async function loadPosts() {
+            try {
+                const res = await fetch(ENDPOINT + '?select=nickname,message,created_at&order=created_at.desc&limit=100', { headers: HEADERS });
+                if (!res.ok) throw new Error(res.status);
+                render(await res.json());
+            } catch (e) {
+                showMessage('投稿の読み込みに失敗しました。');
+            }
+        }
+
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            button.disabled = true;
+            try {
+                const res = await fetch(ENDPOINT, {
+                    method: 'POST',
+                    headers: { ...HEADERS, 'Prefer': 'return=minimal' },
+                    body: JSON.stringify({
+                        nickname: document.getElementById('nickname').value.trim(),
+                        message: document.getElementById('message').value.trim()
+                    })
+                });
+                if (!res.ok) throw new Error(res.status);
+                document.getElementById('message').value = '';
+                await loadPosts();
+            } catch (err) {
+                alert('投稿に失敗しました。もう一度お試しください。');
+            } finally {
+                button.disabled = false;
+            }
+        });
+
+        loadPosts();
+    </script>
+</body>
 </html>
